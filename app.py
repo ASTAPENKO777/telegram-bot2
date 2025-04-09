@@ -1,23 +1,54 @@
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+import logging
+from datetime import datetime
 
 
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+ADMIN_ID = 1836053650  # Замініть на свій ID
 user_states = {}
 user_languages = {}
 
-# Функція для команди /start
+
+async def send_activity_notification(context, user_id: int, username: str, first_name: str, section: str):
+    """Функція для відправки сповіщення про активність користувача"""
+    try:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message = (
+            f"📊 Користувач перейшов у розділ:\n"
+            f"🆔 ID: {user_id}\n"
+            f"👤 Ім'я: {first_name}\n"
+            f"📛 Username: @{username if username else 'немає'}\n"
+            f"📌 Розділ: {section}\n"
+            f"🕒 Час: {timestamp}"
+        )
+        await context.bot.send_message(chat_id=ADMIN_ID, text=message)
+    except Exception as e:
+        logger.error(f"Помилка при відправці сповіщення: {e}")
+
+
 async def start(update: Update, context):
     user_id = update.message.from_user.id
+    username = update.message.from_user.username
+    first_name = update.message.from_user.first_name
+    
     if user_id not in user_states:
         user_states[user_id] = "menu"
         user_languages[user_id] = "uk" 
+    
+    await send_activity_notification(context, user_id, username, first_name, "/start")
+    
     await show_main_menu(update)
 
 
 async def show_main_menu(update: Update):
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
-    # Меню відповідно до мови
     if lang == "uk":
         keyboard = [
             ["📍 Місце розташування", "💰 Ціни"],
@@ -40,21 +71,22 @@ async def show_main_menu(update: Update):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(message, reply_markup=reply_markup)
 
-async def show_location(update: Update):
+
+async def show_location(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "📍 Місце розташування")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
     
-    # Повідомлення з кнопкою, яка веде до Google Maps
     message = (
         "Наші садиби знаходиться в унікальному місці, яке ви точно полюбите! Натисніть кнопку, щоб переглянути карту та побачити, де ми вас чекаємо😊"
         if lang == "uk"
         else "Our manor is located in a unique location that you will definitely love! Click the button to view the map and see where we are waiting for you😊"
     )
 
-    # Текст кнопки залежно від мови
     button_text = "Відкрити на карті🗺️" if lang == "uk" else "Open on map🗺️"
 
-    # Створення кнопки для відкриття карти
     keyboard = [
         [InlineKeyboardButton(button_text, url="https://maps.app.goo.gl/fErdpGampLsAe1dD9")]
     ]
@@ -62,11 +94,13 @@ async def show_location(update: Update):
     await update.message.reply_text(message, reply_markup=reply_markup)
 
 
-async def show_prices(update: Update):
+async def show_prices(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "💰 Ціни")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
     
-    # Фотографії з підписами
     photos = [
         ("https://cf.bstatic.com/xdata/images/hotel/max1024x768/435837164.jpg?k=a1d3f3add1532926bb2992e57f612ce02b8e331f0d66a45aadb72c28306b546d&o=&hp=1", 
          "Будинок: 12-ть осіб на 4 номери, номер 4-х місний 1200грн/день, номер 2-х місний 800грн/день" if lang == "uk" else "House: for 12 people, 4 rooms, 4-person room 1200 UAH/day, 2-person room 800 UAH/day"),
@@ -78,59 +112,51 @@ async def show_prices(update: Update):
          "Чан 1500грн/дві години, кожна наступна година +300грн" if lang == "uk" else "Hot tub 1500 UAH/two hours, each additional hour +300 UAH")
     ]
     
-    # Відправляємо фото з підписами
     for photo, caption in photos:
         await update.message.reply_photo(photo=photo, caption=caption)
 
-    # Текст, який відправляється в кінці
     message = "За додатковою інформацією переходіть | Огляд Садиби |" if lang == "uk" else "For more information, go to | Manor Overview |"
 
-    # Клавіатура "Назад"
     back_button = "↩️ Назад" if lang == "uk" else "↩️ Back"
     keyboard = [[back_button]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    # Відправка текстового повідомлення після фотографій
     await update.message.reply_text(message, reply_markup=reply_markup)
 
 
+async def show_contact(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "📞 Зв'язатись з менеджером")
     
-async def show_contact(update: Update):
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
     
-    # Текст повідомлення
     message = (
         "Контакти:\n- Київстар: +380962812270\n- Vodafone: +380662526155\n- E-mail: lisova.chany@gmail.com"
         if lang == "uk"
         else "Contacts:\n- Kyivstar: +380962812270\n- Vodafone: +380662526155\n- E-mail: lisova.chany@gmail.com"
     )
 
-    # Створення клавіатури з кнопками для Telegram і WhatsApp
     contact_keyboard = [
         [InlineKeyboardButton("Telegram", url="https://t.me/Vasyl_Astapenko")],
         [InlineKeyboardButton("WhatsApp", url="https://wa.me/qr/DW5RV3NAQ27YO1")],
     ]
 
-    # Переклад кнопки "Назад" залежно від мови
     back_button = "↩️ Назад" if lang == "uk" else "↩️ Back"
     back_keyboard = [[back_button]] 
     
-    # Створення розмітки клавіатури для контактів
     contact_markup = InlineKeyboardMarkup(contact_keyboard)
-    # Створення розмітки клавіатури для кнопки "Назад"
     back_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
 
-    # Відправлення повідомлення з контактами та кнопками для Telegram і WhatsApp
     await update.message.reply_text(message, parse_mode='Markdown', reply_markup=contact_markup)
     
-    # Додамо кнопку "Назад"
     await update.message.reply_text("Натисніть 'Назад', щоб повернутися в головне меню." if lang == "uk" else "Press 'Back' to return to the main menu.", reply_markup=back_markup)
 
 
-
-# Функція для соцмереж
-async def show_social_media(update: Update):
+async def show_social_media(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "🌐 Ми в соцмережах")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
     
@@ -145,17 +171,17 @@ async def show_social_media(update: Update):
         button2 = InlineKeyboardButton("Facebook", url="https://www.facebook.com/lisovahatuna")
         button3 = InlineKeyboardButton("TikTok", url="https://www.tiktok.com/@lisovahatinachan?is_from_webapp=1&sender_device=pc")
     
-    # Клавіатура для соцмереж
     social_media_keyboard = [[button1], [button2], [button3]]
     
-    # Відправка повідомлення з соцмережами без кнопки "Назад"
     await update.message.reply_text(message, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(social_media_keyboard))
 
-# Функція для зміни мови
-async def change_language(update: Update):
+
+async def change_language(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "🌍 Змінити мову")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
-    # Відображення вибору мови
     keyboard = [
         ["Українська", "English"]
     ]
@@ -166,72 +192,69 @@ async def change_language(update: Update):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(message, reply_markup=reply_markup)
 
-# Функція для обробки текстових повідомлень
+
 async def handle_message(update: Update, context):
     user_id = update.message.from_user.id
     text = update.message.text.strip().lower() 
     lang = user_languages.get(user_id, "uk")
     
-    print(f"Отримано повідомлення від користувача: {text}") 
+    logger.info(f"Отримано повідомлення від користувача {user_id}: {text}")
     
-    # Перевірка вибору мови
     if text == "українська" or text == "english":
         user_languages[user_id] = "uk" if text == "українська" else "en"
         await show_main_menu(update)
         return
     
-    # Обробка вибору меню
     if text == "📍 місце розташування" or text == "📍 location":
-        await show_location(update)
+        await show_location(update, context)
         return
     elif text == "💰 ціни" or text == "💰 prices":
-        await show_prices(update)
+        await show_prices(update, context)
         return
     elif text == "📞 зв'язатись з менеджером" or text == "📞 contact the manager":
-        await show_contact(update)
+        await show_contact(update, context)
         return
     elif text == "🏞️ місця поблизу" or text == "🏞️ nearby places":
-        await show_nearby_places(update)
+        await show_nearby_places(update, context)
         return
     elif text == "🌐 ми в соцмережах" or text == "🌐 social media":
-        await show_social_media(update)
+        await show_social_media(update, context)
         return
     elif text == "🌐 наш сайт" or text == "🌐 our website":
-        await show_website(update)
+        await show_website(update, context)
         return
     elif text == "🛖 огляд садиби" or text == "🛖 cottage overview":
-        await show_cottage_overview(update)
+        await show_cottage_overview(update, context)
         return
     elif text == "чан!" or text == "bath!":
-        await show_bath(update)
+        await show_bath(update, context)
         return
     elif text == "🌍 змінити мову" or text == "🌍 change language":
-        await change_language(update)
+        await change_language(update, context)
         return
     elif text == "↩️ назад" or text == "↩️ back":  
         await show_main_menu(update)
     return
     
-    # Випадок, коли введення не розпізнане
     response = "Невідомий вибір. Спробуйте ще раз." if lang == "uk" else "Unknown choice. Please try again."
     await update.message.reply_text(response, parse_mode='Markdown')
 
 
-async def show_nearby_places(update: Update):
+async def show_nearby_places(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "🏞️ Місця поблизу")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
     
-    # Основне повідомлення
     message = (
         "Фотогалерея🌸" if lang == "uk" else "Photo Gallery🌸"
     )
     keyboard = [["↩️ Назад" if lang == "uk" else "↩️ Back"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    # Відправляємо основне повідомлення
     await update.message.reply_text(message, reply_markup=reply_markup)
 
-    # Список фото з підписами
     photos = [
         (
             "https://karpatytravel.net/wp-content/uploads/2020/08/ozero-sinevir-3.jpg", 
@@ -247,7 +270,7 @@ async def show_nearby_places(update: Update):
         ),
         (
             "https://myukraine.org.ua/wp-content/uploads/2017/04/vodospad-shypit-1-min-min.jpg",
-            "Водоспад Шипіт розташований на північних схилах Полонини Боржави, біля села Пилипець. Це один з семи природних чудес України, який причаровує своєю красою в будь-яку пору року. (24-км від садиби)"
+            "Водоспад Шипіт розташований на північних схилах Полонини Боржави, біля села Пилипець. Це один із семи природних чудес України, який причаровує своєю красою в будь-яку пору року. (24-км від садиби)"
             if lang == "uk" else 
             "The Shypit Waterfall is located on the northern slopes of the Borzhava Polonyna near the village of Pylypets. It is one of the seven natural wonders of Ukraine, enchanting with its beauty at any time of the year. (24 km from the manor)"
         ),
@@ -271,39 +294,41 @@ async def show_nearby_places(update: Update):
         )
     ]
     
-    # Надсилаємо фотографії з підписами
     for photo, caption in photos:
         await update.message.reply_photo(photo=photo, caption=caption)
 
 
-
-async def show_website(update: Update):
+async def show_website(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "🌐 Наш сайт")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
 
-    # Повідомлення про сайт
     message = (
         "Ласкаво просимо на сайт нашої садиби відпочинку! Тут ви знайдете всю необхідну інформацію про комфортний відпочинок серед природи. Ознайомтесь з варіантами проживання, цінами та спеціальними пропозиціями. Забронюйте свій ідеальний відпочинок вже зараз😊"
         if lang == "uk" else
         "Welcome to the website of our holiday cottage! Here you will find all the necessary information about a comfortable vacation amidst nature. Explore accommodation options, prices, and special offers. Book your perfect holiday now😊"
     )
 
-    # Кнопка для переходу на сайт
     website_button = [
-        [InlineKeyboardButton("Перейти на САЙТ" if lang == "uk" else "Visit WEBSITE", url="https://forest-hut.com/")]
+        [InlineKeyboardButton(
+            "Перейти на САЙТ" if lang == "uk" else "Visit WEBSITE", 
+            web_app=WebAppInfo(url="https://forest-hut.com/")
+        )]
     ]
     reply_markup = InlineKeyboardMarkup(website_button)
 
-    # Відправка повідомлення з кнопкою
     await update.message.reply_text(message, reply_markup=reply_markup)
 
-    
 
-async def show_cottage_overview(update: Update):
+async def show_cottage_overview(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "🛖 Огляд садиби")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
 
-    # Опис для огляду садиби на двох мовах
     if lang == "uk":
         message = (
             "Ласкаво просимо до нашої садиби! 🏡\n\n"
@@ -341,7 +366,6 @@ async def show_cottage_overview(update: Update):
         caption_fifth_photo = "№3 Double room 800 UAH/day."
         caption_sixth_photo = "№4 Double room 800 UAH/day."
 
-    # Фотографії садиби
     photo_files = [
         ("https://cf.bstatic.com/xdata/images/hotel/max1024x768/435837164.jpg?k=a1d3f3add1532926bb2992e57f612ce02b8e331f0d66a45aadb72c28306b546d&o=&hp=1", caption_first_photo), 
         ("https://cf.bstatic.com/xdata/images/hotel/max1024x768/435837112.jpg?k=c72e730a476a4d8dd5848beea931d81c946bc77855a59e16dcfba522ec7b608c&o=&hp=1", caption_second_photo),
@@ -351,28 +375,25 @@ async def show_cottage_overview(update: Update):
         ("https://cf.bstatic.com/xdata/images/hotel/max1024x768/618900587.jpg?k=6afb899983636d99bbf89f07344516c2eefd7abb541a1d2fc75befcadae21547&o=&hp=1", caption_sixth_photo), 
     ]
     
-    # Відправка текстового опису
     await update.message.reply_text(message)
 
-    # Відправка фотографій з підписами
     for photo_path, caption in photo_files:
         await update.message.reply_photo(photo_path, caption=caption)
 
-    # Переклад кнопки "Назад" залежно від мови
     back_button = "↩️ Назад" if lang == "uk" else "↩️ Back"
     keyboard = [[back_button]]  
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    # Відправка кнопки "Назад"
     await update.message.reply_text("Натисніть 'Назад' для повернення." if lang == "uk" else "Press 'Back' to return.", reply_markup=reply_markup)
 
- 
-# Функція для чану з фото та описом
-async def show_bath(update: Update):
+
+async def show_bath(update: Update, context):
+    user = update.message.from_user
+    await send_activity_notification(context, user.id, user.username, user.first_name, "Чан!")
+    
     user_id = update.message.from_user.id
     lang = user_languages.get(user_id, "uk")
 
-    # Опис
     if lang == "uk":
         message = (
             "Оздоровчий ЧАН з гірськими травами на 8 осіб — 1500 грн за 2 години процедури. Кожна наступна година +300 грн.\n\n"
@@ -407,11 +428,10 @@ async def show_bath(update: Update):
     else:
         await update.message.reply_text("Press 'Back' to return.", reply_markup=reply_markup)
 
-
 if __name__ == "__main__":
-    TOKEN = "" # Вставте свій API токен
+    TOKEN = "7386787272:AAEI9qY8t8G25CfDZ9jyOxBQPxKTGu8QkCc"
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("Бот запущено...")
+    logger.info("Бот запущено...")
     app.run_polling()
