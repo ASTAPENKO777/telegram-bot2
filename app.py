@@ -429,7 +429,7 @@ async def show_bath(update: Update, context):
         await update.message.reply_text("Press 'Back' to return.", reply_markup=reply_markup)
 
 if __name__ == "__main__":
-    TOKEN = "7386787272:AAEI9qY8t8G25CfDZ9jyOxBQPxKTGu8QkCc"
+    TOKEN = ""
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
