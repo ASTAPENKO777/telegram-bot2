@@ -10,7 +10,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-ADMIN_ID = 1836053650  # Замініть на свій ID
+ADMIN_ID =   # Замініть на свій ID
 user_states = {}
 user_languages = {}
 
